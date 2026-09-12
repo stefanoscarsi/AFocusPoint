@@ -52,6 +52,11 @@ class _ZoomableImageLabel(QLabel):
             self._window._on_drag_move(event.pos())
         super().mouseMoveEvent(event)
 
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802 - override Qt
+        if event.button() == Qt.LeftButton:
+            self._window._on_drag_end()
+        super().mouseReleaseEvent(event)
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -132,6 +137,7 @@ class MainWindow(QMainWindow):
             result = frame_builder.build_frame(path)
 
             self._reset_zoom_state()
+            self._update_cursor()
             self._show_image(result.image)
             self.info_panel.update_data(result)
             self.statusBar().showMessage(f"Caricato: {path.name}")
@@ -196,6 +202,17 @@ class MainWindow(QMainWindow):
     def _reset_zoom(self) -> None:
         self._reset_zoom_state()
         self._update_displayed_pixmap()
+        self._update_cursor()
+
+    def _update_cursor(self) -> None:
+        # A "grab hand" is the standard affordance for "click and drag to
+        # pan" -- without it, dragging a zoomed photo only via the
+        # scrollbars is easy to miss entirely. Shown only once there's
+        # actually something to pan into (i.e. past the fit-to-screen zoom).
+        if self._zoom > zoom_utils.MIN_ZOOM:
+            self.image_label.setCursor(Qt.OpenHandCursor)
+        else:
+            self.image_label.unsetCursor()
 
     def _on_wheel(self, event) -> None:
         if self._current_pixmap is None:
@@ -229,6 +246,7 @@ class MainWindow(QMainWindow):
 
         self._zoom = new_zoom
         self._update_displayed_pixmap()
+        self._update_cursor()
 
         new_pixmap = self.image_label.pixmap()
         if new_pixmap is not None and not new_pixmap.isNull():
@@ -243,6 +261,11 @@ class MainWindow(QMainWindow):
             self.image_scroll.horizontalScrollBar().value(),
             self.image_scroll.verticalScrollBar().value(),
         )
+        if self._zoom > zoom_utils.MIN_ZOOM:
+            # "Grabbing" feedback for the duration of the drag, mirroring
+            # the open/closed hand convention from Photoshop/Lightroom's
+            # pan tool.
+            self.image_label.setCursor(Qt.ClosedHandCursor)
 
     def _on_drag_move(self, pos: QPoint) -> None:
         if self._zoom <= zoom_utils.MIN_ZOOM or self._drag_start is None:
@@ -251,3 +274,7 @@ class MainWindow(QMainWindow):
         dy = pos.y() - self._drag_start.y()
         self.image_scroll.horizontalScrollBar().setValue(self._drag_start_scroll[0] - dx)
         self.image_scroll.verticalScrollBar().setValue(self._drag_start_scroll[1] - dy)
+
+    def _on_drag_end(self) -> None:
+        self._drag_start = None
+        self._update_cursor()
