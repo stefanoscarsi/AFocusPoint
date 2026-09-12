@@ -114,7 +114,7 @@ def _display_box_for_search_zone(
 def build_frame(raw_path: str | Path) -> FrameResult:
     raw_path = Path(raw_path)
     metadata = exif_reader.read_all_metadata(raw_path)
-    shooting = af_parser.get_shooting_data(metadata["formatted"])
+    shooting = af_parser.get_shooting_data(metadata["raw"], metadata["formatted"])
     af_data = af_parser.get_af_data_structured(metadata["raw"], metadata["formatted"])
 
     preview = preview_extractor.extract_preview_image(raw_path)

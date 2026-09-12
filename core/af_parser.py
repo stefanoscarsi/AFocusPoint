@@ -190,10 +190,31 @@ _AF_AREA_MODE_DESCRIPTIONS = {
 # Estrazione dati di scatto
 # ---------------------------------------------------------------------------
 
-def get_shooting_data(formatted_metadata: dict) -> ShootingData:
+_COLOR_TEMPERATURE_TAGS = ["Canon:ColorTemperature"]
+_WHITE_BALANCE_MODE_TAGS = ["Canon:WhiteBalance", "ExifIFD:WhiteBalance", "EXIF:WhiteBalance"]
+
+
+def _white_balance_display(raw_metadata: dict, formatted_metadata: dict) -> str | None:
+    """Prefers the actual Kelvin value used for the shot (Canon:ColorTemperature
+    -- present regardless of WB mode: Auto, a preset like Daylight/Cloudy, or
+    Manual Kelvin all populate it with whatever temperature was actually
+    applied) over the WhiteBalance MODE name (e.g. "Auto", "Manual Temperature
+    (Kelvin)"), which says how it was set but not what temperature resulted.
+    Falls back to the mode name if no numeric temperature is available."""
+    color_temp = _first_present(raw_metadata, _COLOR_TEMPERATURE_TAGS)
+    if color_temp is not None:
+        try:
+            return f"{int(color_temp)} K"
+        except (TypeError, ValueError):
+            pass
+    return _first_present(formatted_metadata, _WHITE_BALANCE_MODE_TAGS)
+
+
+def get_shooting_data(raw_metadata: dict, formatted_metadata: dict) -> ShootingData:
     """
-    Costruisce i dati di scatto a partire dal dizionario 'formatted'
-    (valori leggibili, non numerici grezzi) restituito da exif_reader.
+    Costruisce i dati di scatto a partire dai dizionari 'raw' (valori
+    numerici grezzi) e 'formatted' (valori leggibili) restituiti da
+    exif_reader.
     """
     # NOTA CALIBRAZIONE: verificato su un CR3 reale di R6 III che, con
     # raggruppamento -G1, ExifTool usa il gruppo "ExifIFD" (non "EXIF") per
@@ -218,7 +239,7 @@ def get_shooting_data(formatted_metadata: dict) -> ShootingData:
         focal_length=_first_present(d, ["ExifIFD:FocalLength", "EXIF:FocalLength"]),
         exposure_mode=_first_present(d, ["ExifIFD:ExposureProgram", "Canon:CanonExposureMode", "EXIF:ExposureProgram"]),
         metering_mode=_first_present(d, ["ExifIFD:MeteringMode", "Canon:MeteringMode", "EXIF:MeteringMode"]),
-        white_balance=_first_present(d, ["Canon:WhiteBalance", "ExifIFD:WhiteBalance", "EXIF:WhiteBalance"]),
+        white_balance=_white_balance_display(raw_metadata, d),
         image_width=int(width) if width else None,
         image_height=int(height) if height else None,
     )

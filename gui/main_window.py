@@ -22,6 +22,7 @@ from PySide6.QtCore import QRectF, Qt
 from PySide6.QtGui import QAction, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
+    QGraphicsItem,
     QGraphicsPixmapItem,
     QGraphicsScene,
     QGraphicsView,
@@ -48,6 +49,12 @@ class _ZoomableGraphicsView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.AnchorViewCenter)
         self.setDragMode(QGraphicsView.NoDrag)
+        # MinimalViewportUpdate (the default) spends time computing exactly
+        # which small region changed on every scroll step; with one item
+        # that fills the whole viewport, that bookkeeping is pure overhead
+        # since virtually the whole viewport is "dirty" on every pan step
+        # anyway -- FullViewportUpdate skips it.
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
 
     def wheelEvent(self, event) -> None:  # noqa: N802 - override Qt
         self._window._on_wheel(event)
@@ -93,6 +100,13 @@ class MainWindow(QMainWindow):
 
         self.scene = QGraphicsScene()
         self.pixmap_item = QGraphicsPixmapItem()
+        # Caches the item's rendered (bilinear-interpolated) pixels in
+        # device coordinates. Panning only translates the view -- it
+        # doesn't change the item's transform relative to the viewport --
+        # so Qt can blit this cache instead of re-interpolating the full
+        # multi-megapixel source on every mouse-move step, which is what
+        # made dragging feel heavy/sluggish on a large RAW preview.
+        self.pixmap_item.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.scene.addItem(self.pixmap_item)
 
         self.image_view = _ZoomableGraphicsView(self)
