@@ -111,13 +111,13 @@ class InfoPanel(QWidget):
             if result.sharpness_matches:
                 messages.append(
                     f"Nitidezza nel punto AF: {result.af_sharpness:.0f} — "
-                    "corrisponde all'area piu' nitida della foto (buon "
+                    "corrisponde all'area piu' nitida nei dintorni (buon "
                     "posizionamento del fuoco)."
                 )
             else:
                 messages.append(
                     f"Nitidezza nel punto AF: {result.af_sharpness:.0f}   contro "
-                    f"{result.best_sharpness:.0f} nell'area piu' nitida della foto "
+                    f"{result.best_sharpness:.0f} nell'area piu' nitida qui vicino "
                     "(riquadro blu)."
                 )
             messages.append(SHARPNESS_CAVEAT)

@@ -156,11 +156,20 @@ def build_frame(raw_path: str | Path) -> FrameResult:
             (box for box, color in display_boxes if color == overlay_renderer.COLOR_PRIMARY),
             display_boxes[0][0],
         )
-        af_sharpness = sharpness.region_sharpness(cropped, primary_box)
-        best_box, best_sharpness = sharpness.find_sharpest_tile(cropped)
-        sharpness_matches = geometry.boxes_overlap(primary_box, best_box)
-        if not sharpness_matches:
-            annotated = overlay_renderer.draw_sharp_box(annotated, best_box)
+        # Same tile granularity on both sides of the comparison, and
+        # restricted to a neighbourhood around the AF point rather than the
+        # whole photo -- see sharpness.py's docstring for why the original
+        # "average over the AF box vs. best tile in the whole frame"
+        # approach was systematically biased toward false mismatches.
+        af_sharpness = sharpness.best_tile_score(cropped, primary_box)
+        if af_sharpness is not None:
+            best_box, best_sharpness = sharpness.find_sharpest_nearby_tile(cropped, primary_box)
+            sharpness_matches = (
+                geometry.boxes_overlap(primary_box, best_box)
+                or best_sharpness <= af_sharpness * sharpness.MISMATCH_TOLERANCE
+            )
+            if not sharpness_matches:
+                annotated = overlay_renderer.draw_sharp_box(annotated, best_box)
 
     return FrameResult(
         image=annotated,
