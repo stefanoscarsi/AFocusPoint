@@ -6,8 +6,6 @@ App desktop (Windows/Mac/Linux) che legge un file RAW e mostra:
 - il/i punto/i di messa a fuoco sovrapposti all'anteprima della foto,
   posizionati correttamente anche su foto ritagliate/ruotate in DxO PhotoLab
 - zoom sull'anteprima (rotellina del mouse, trascinamento per spostarsi)
-- un confronto (indicativo) tra la nitidezza del punto AF e quella del
-  resto della foto, per aiutarti a capire se hai messo a fuoco altro
 
 > **Funziona ed è stato testato solo con fotocamere Canon** (formato CR3 e
 > metadati MakerNotes Canon). Pensata inizialmente per la **Canon EOS R6
@@ -170,7 +168,6 @@ AFocusPoint/
 │   ├── geometry.py            # matematica di rotazione/ritaglio/scala (pura)
 │   ├── image_ops.py           # applica orientamento/ritaglio all'anteprima
 │   ├── overlay_renderer.py    # disegna i punti AF sull'anteprima
-│   ├── sharpness.py           # confronto di nitidezza (indicativo)
 │   └── frame_builder.py       # orchestratore: metadati -> geometria -> disegno
 ├── gui/
 │   ├── main_window.py         # finestra principale (con zoom/pan)

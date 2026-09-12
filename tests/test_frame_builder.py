@@ -81,7 +81,6 @@ def test_unsupported_correction_returns_warning_and_no_boxes(monkeypatch, tmp_pa
     result = frame_builder.build_frame(raw_path)
 
     assert result.geometry_warning == frame_builder._UNSUPPORTED_CORRECTION_WARNING
-    assert result.af_sharpness is None
     # No box color anywhere on the (otherwise flat black) image.
     pixels = result.image.load()
     w, h = result.image.size
@@ -90,7 +89,7 @@ def test_unsupported_correction_returns_warning_and_no_boxes(monkeypatch, tmp_pa
     )
 
 
-def test_confirmed_single_af_point_draws_box_and_computes_sharpness(monkeypatch, tmp_path):
+def test_confirmed_single_af_point_draws_box(monkeypatch, tmp_path):
     _stub(
         monkeypatch,
         raw_extra=_af_tags(x=0, y=0, w=100, h=100, ref=(400, 300)),
@@ -102,9 +101,6 @@ def test_confirmed_single_af_point_draws_box_and_computes_sharpness(monkeypatch,
     result = frame_builder.build_frame(raw_path)
 
     assert result.geometry_warning is None
-    assert result.af_sharpness is not None
-    assert result.best_sharpness is not None
-    assert result.sharpness_matches is not None
     pixels = result.image.load()
     w, h = result.image.size
     assert any(
@@ -129,7 +125,6 @@ def test_ambiguous_af_with_no_confirmed_point_draws_only_search_zone(monkeypatch
     result = frame_builder.build_frame(raw_path)
 
     assert result.af_data.points == []
-    assert result.af_sharpness is None
     pixels = result.image.load()
     w, h = result.image.size
     assert any(
@@ -156,4 +151,3 @@ def test_af_point_outside_crop_sets_clipped_warning(monkeypatch, tmp_path):
     result = frame_builder.build_frame(raw_path)
 
     assert result.geometry_warning == frame_builder._CLIPPED_BY_CROP_WARNING
-    assert result.af_sharpness is None

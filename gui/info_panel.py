@@ -5,7 +5,7 @@ Pannello laterale con due sezioni:
   - Dati di scatto (camera, esposizione, obiettivo...)
   - Dati di autofocus (modalita', punti usati, punto primario...)
 Piu' un'area avvisi/indicazioni (AF ambiguo, ritaglio/rotazione non
-gestibile, confronto di nitidezza).
+gestibile).
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QWidget
 
-from core.frame_builder import SHARPNESS_CAVEAT, FrameResult
+from core.frame_builder import FrameResult
 
 
 def _row(label: str, value) -> str:
@@ -106,20 +106,5 @@ class InfoPanel(QWidget):
 
         if result.geometry_warning:
             messages.append(f"⚠ {result.geometry_warning}")
-
-        if result.af_sharpness is not None and result.best_sharpness is not None:
-            if result.sharpness_matches:
-                messages.append(
-                    f"Nitidezza nel punto AF: {result.af_sharpness:.0f} — "
-                    "corrisponde all'area piu' nitida nei dintorni (buon "
-                    "posizionamento del fuoco)."
-                )
-            else:
-                messages.append(
-                    f"Nitidezza nel punto AF: {result.af_sharpness:.0f}   contro "
-                    f"{result.best_sharpness:.0f} nell'area piu' nitida qui vicino "
-                    "(riquadro blu)."
-                )
-            messages.append(SHARPNESS_CAVEAT)
 
         return "\n\n".join(messages)

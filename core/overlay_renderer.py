@@ -8,7 +8,6 @@ Colors:
   - verde  = punto/area effettivamente a fuoco
   - rosso  = punto primario (primary_point_index), se identificabile
   - blu (tratteggio sottile) = zona di ricerca complessiva (contesto)
-  - blu (bordo pieno) = area della foto risultata piu' nitida nel confronto
 """
 from __future__ import annotations
 
@@ -19,7 +18,6 @@ from . import geometry
 COLOR_IN_FOCUS = (0, 230, 0)
 COLOR_PRIMARY = (255, 40, 40)
 COLOR_SEARCH_ZONE = (0, 160, 255)
-COLOR_SHARPEST = (0, 140, 255)
 LINE_WIDTH = 3
 
 
@@ -50,12 +48,3 @@ def draw_af_points(
         draw.line([cx, cy - 6, cx, cy + 6], fill=color, width=LINE_WIDTH)
 
     return result
-
-
-def draw_sharp_box(image: Image.Image, box: geometry.Box) -> Image.Image:
-    """Marks the photo's actual sharpest region (per sharpness.find_sharpest_tile)
-    in a color distinct from the AF box colors, so the user can compare them."""
-    annotated = image.copy()
-    draw = ImageDraw.Draw(annotated)
-    draw.rectangle([box.left, box.top, box.right, box.bottom], outline=COLOR_SHARPEST, width=LINE_WIDTH)
-    return annotated

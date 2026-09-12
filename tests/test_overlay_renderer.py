@@ -35,12 +35,3 @@ def test_draw_af_points_with_no_boxes_and_no_search_zone_is_a_noop_copy():
     annotated = overlay_renderer.draw_af_points(img, [])
     assert annotated.getpixel((50, 50)) == (0, 0, 0)
     assert annotated is not img
-
-
-def test_draw_sharp_box_uses_a_distinct_color():
-    img = Image.new("RGB", (100, 100), "black")
-    box = geometry.Box(left=20, top=20, right=80, bottom=80)
-    annotated = overlay_renderer.draw_sharp_box(img, box)
-    assert annotated.getpixel((50, 20)) == overlay_renderer.COLOR_SHARPEST
-    assert overlay_renderer.COLOR_SHARPEST != overlay_renderer.COLOR_IN_FOCUS
-    assert overlay_renderer.COLOR_SHARPEST != overlay_renderer.COLOR_PRIMARY

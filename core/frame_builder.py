@@ -1,7 +1,17 @@
 """Orchestrates the full pipeline for one CR3: read metadata, extract the
-preview, apply PhotoLab's crop/rotation (if any), work out where the AF
-point(s) land on the final image, draw them, and score sharpness as a
-cross-check. Pulled out of gui/main_window.py so it can be tested without Qt.
+preview, apply PhotoLab's crop/rotation (if any), and work out where the AF
+point(s) land on the final image before drawing them. Pulled out of
+gui/main_window.py so it can be tested without Qt.
+
+A sharpness-based "is this really the sharpest area?" cross-check used to
+live here too. It was removed: even after fixing a real measurement bias
+(comparing the AF box's average against the single sharpest tile in the
+whole photo -- an unfair comparison that flagged ~95% of confirmed-AF real
+photos as a mismatch) and restricting it to a local neighbourhood (which
+brought that down to ~70%), it still pointed at areas the user could see
+weren't actually the sharpest. Comparing sharpness across a single frame
+this way just isn't reliable enough to show as a feature -- see git history
+(core/sharpness.py) if picking this up again.
 """
 from __future__ import annotations
 
@@ -10,7 +20,7 @@ from pathlib import Path
 
 from PIL import Image
 
-from . import af_parser, dop_parser, exif_reader, geometry, image_ops, overlay_renderer, preview_extractor, sharpness
+from . import af_parser, dop_parser, exif_reader, geometry, image_ops, overlay_renderer, preview_extractor
 
 # Orientations image_ops.apply_orientation / geometry.rotate_point can handle.
 # Mirrored EXIF values (2/4/5/7) are effectively never produced by Canon RAWs;
@@ -20,14 +30,6 @@ _SUPPORTED_ORIENTATIONS = (1, 3, 6, 8)
 
 _UNSUPPORTED_CORRECTION_WARNING = "Posizione non garantita — correzione prospettica non gestita"
 _CLIPPED_BY_CROP_WARNING = "Il punto AF cade fuori dall'area ritagliata"
-
-SHARPNESS_CAVEAT = (
-    "Indicativo, non prova di un errore di messa a fuoco — il confronto "
-    "diventa inaffidabile in controluce o su scene ad alto contrasto "
-    "(confermato su una foto reale: un soggetto correttamente a fuoco in "
-    "luce piatta ha ottenuto un punteggio molto piu' basso di un ramoscello "
-    "sfocato ma illuminato dal sole). Verifica visivamente ingrandendo."
-)
 
 
 @dataclass
@@ -39,12 +41,6 @@ class FrameResult:
     # box confidently -- independent of af_parser's own "ambiguous AF" case,
     # which info_panel already reports from af_data.points being empty.
     geometry_warning: str | None = None
-    # Populated only when at least one AF box was actually drawn -- with
-    # nothing "identified" to compare against, a sharpness readout has no
-    # meaningful baseline.
-    af_sharpness: float | None = None
-    best_sharpness: float | None = None
-    sharpness_matches: bool | None = None
 
 
 def _geometry_without_sidecar(raw_metadata: dict) -> dop_parser.Geometry:
@@ -148,35 +144,9 @@ def build_frame(raw_path: str | Path) -> FrameResult:
 
     annotated = overlay_renderer.draw_af_points(cropped, display_boxes, search_zone_box)
 
-    af_sharpness = None
-    best_sharpness = None
-    sharpness_matches = None
-    if display_boxes:
-        primary_box = next(
-            (box for box, color in display_boxes if color == overlay_renderer.COLOR_PRIMARY),
-            display_boxes[0][0],
-        )
-        # Same tile granularity on both sides of the comparison, and
-        # restricted to a neighbourhood around the AF point rather than the
-        # whole photo -- see sharpness.py's docstring for why the original
-        # "average over the AF box vs. best tile in the whole frame"
-        # approach was systematically biased toward false mismatches.
-        af_sharpness = sharpness.best_tile_score(cropped, primary_box)
-        if af_sharpness is not None:
-            best_box, best_sharpness = sharpness.find_sharpest_nearby_tile(cropped, primary_box)
-            sharpness_matches = (
-                geometry.boxes_overlap(primary_box, best_box)
-                or best_sharpness <= af_sharpness * sharpness.MISMATCH_TOLERANCE
-            )
-            if not sharpness_matches:
-                annotated = overlay_renderer.draw_sharp_box(annotated, best_box)
-
     return FrameResult(
         image=annotated,
         shooting=shooting,
         af_data=af_data,
         geometry_warning=geometry_warning,
-        af_sharpness=af_sharpness,
-        best_sharpness=best_sharpness,
-        sharpness_matches=sharpness_matches,
     )
