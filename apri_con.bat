@@ -1,7 +1,7 @@
 @echo off
 REM Wrapper per "Apri con..." / editor esterno di DxO PhotoLab, da usare SOLO
 REM se stai eseguendo il programma dai sorgenti (con l'ambiente virtuale
-REM "venv"), non con l'eseguibile CanonAFPointViewer.exe.
+REM "venv"), non con l'eseguibile AFocusPoint.exe.
 REM
 REM Perche' serve: Explorer/DxO possono lanciare solo un .exe passandogli il
 REM percorso del file, ma per eseguire i sorgenti serve invocare

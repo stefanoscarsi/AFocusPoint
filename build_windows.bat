@@ -28,7 +28,7 @@ echo un file abbastanza grande ^(200-350 MB^), perche' include l'intero
 echo framework grafico Qt necessario per l'interfaccia. E' normale.
 echo.
 venv\Scripts\python.exe -m PyInstaller ^
-    --name "CanonAFPointViewer" ^
+    --name "AFocusPoint" ^
     --windowed ^
     --onefile ^
     --icon "assets\icon.ico" ^
@@ -48,7 +48,7 @@ if errorlevel 1 (
 echo.
 echo ============================================
 echo Fatto! Trovi il file pronto in:
-echo   dist\CanonAFPointViewer.exe
+echo   dist\AFocusPoint.exe
 echo.
 echo Puoi copiarlo/spostarlo dove vuoi ^(es. Desktop^): funziona da solo,
 echo non serve piu' questa cartella di progetto per lanciarlo.

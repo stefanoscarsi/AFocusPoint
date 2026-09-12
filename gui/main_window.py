@@ -56,7 +56,7 @@ class _ZoomableImageLabel(QLabel):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Canon AF Point Viewer — Punto di messa a fuoco")
+        self.setWindowTitle("AFocusPoint — Punto di messa a fuoco")
         self.resize(1200, 800)
 
         self._current_pixmap: QPixmap | None = None  # sempre a piena risoluzione

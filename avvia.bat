@@ -1,5 +1,5 @@
 @echo off
-REM Avvia Canon AF Point Viewer con un doppio click.
+REM Avvia AFocusPoint con un doppio click.
 REM Si posiziona da solo nella cartella dove si trova questo file,
 REM quindi funziona indipendentemente da dove lo lanci.
 

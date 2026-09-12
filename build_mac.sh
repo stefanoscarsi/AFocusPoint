@@ -28,7 +28,7 @@ echo "abbastanza grande (200-350 MB), perche' include l'intero framework"
 echo "grafico Qt necessario per l'interfaccia. E' normale."
 echo ""
 venv/bin/python3 -m PyInstaller \
-    --name "Canon AF Point Viewer" \
+    --name "AFocusPoint" \
     --windowed \
     --onefile \
     --icon "assets/icon.icns" \
@@ -48,7 +48,7 @@ fi
 echo ""
 echo "============================================"
 echo "Fatto! Trovi l'app pronta in:"
-echo "  dist/Canon AF Point Viewer.app"
+echo "  dist/AFocusPoint.app"
 echo ""
 echo "Trascinala pure nella cartella Applicazioni: funziona da sola,"
 echo "non serve piu' questa cartella di progetto per lanciarla."

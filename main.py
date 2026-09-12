@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Punto di ingresso dell'app: Canon AF Point Viewer.
+Punto di ingresso dell'app: AFocusPoint.
 Avvio: python3 main.py
 Avvio con un file gia' aperto: python3 main.py "percorso/foto.CR3"
 (e' questo il meccanismo usato da Windows/DxO PhotoLab quando l'app viene

@@ -1,11 +1,17 @@
-# Canon AF Point Viewer
+# AFocusPoint
 
-App desktop (Windows/Mac/Linux) che legge un file CR3 e mostra:
+App desktop (Windows/Mac/Linux) che legge un file RAW e mostra:
 - i dati di scatto (fotocamera, obiettivo, esposizione, ISO, focale...)
 - il tipo di AF usato (modalità area AF, One-Shot/Servo, punti usati)
-- il/i punto/i di messa a fuoco sovrapposti all'anteprima della foto
+- il/i punto/i di messa a fuoco sovrapposti all'anteprima della foto,
+  posizionati correttamente anche su foto ritagliate/ruotate in DxO PhotoLab
+- zoom sull'anteprima (rotellina del mouse, trascinamento per spostarsi)
+- un confronto (indicativo) tra la nitidezza del punto AF e quella del
+  resto della foto, per aiutarti a capire se hai messo a fuoco altro
 
-Pensata inizialmente per la **Canon EOS R6 Mark III**.
+> **Funziona ed è stato testato solo con fotocamere Canon** (formato CR3 e
+> metadati MakerNotes Canon). Pensata inizialmente per la **Canon EOS R6
+> Mark III**; il supporto ad altre marche non è previsto allo stato attuale.
 
 ## ⚠️ Leggi prima di iniziare: perché serve una calibrazione
 
@@ -98,7 +104,7 @@ stessa piattaforma per cui vuoi generare il file** (non si può creare un
 .exe Windows da un Mac o viceversa: va fatto sul sistema di destinazione).
 
 **Windows:** doppio click su `build_windows.bat`.
-Al termine trovi l'eseguibile in `dist\CanonAFPointViewer.exe`, con l'icona
+Al termine trovi l'eseguibile in `dist\AFocusPoint.exe`, con l'icona
 personalizzata inclusa in `assets/icon.ico`.
 
 **Mac:** apri il Terminale, vai nella cartella del progetto ed esegui:
@@ -106,7 +112,7 @@ personalizzata inclusa in `assets/icon.ico`.
 chmod +x build_mac.sh   # solo la prima volta, da' il permesso di esecuzione
 ./build_mac.sh
 ```
-Al termine trovi l'app in `dist/Canon AF Point Viewer.app`, con l'icona
+Al termine trovi l'app in `dist/AFocusPoint.app`, con l'icona
 personalizzata inclusa in `assets/icon.icns`, trascinabile in Applicazioni. Al primo avvio macOS potrebbe segnalarla come "app di
 sviluppatore non identificato" (Gatekeeper): tasto destro sull'app → Apri
 → Apri comunque.
@@ -129,7 +135,7 @@ Per far sì che Windows (tasto destro → **Apri con...**) o DxO PhotoLab
 devi indicare loro **quale eseguibile lanciare**. Il file da indicare
 dipende da come usi il programma:
 
-- **Hai generato `CanonAFPointViewer.exe`** (vedi punto 4 sopra): indica
+- **Hai generato `AFocusPoint.exe`** (vedi punto 4 sopra): indica
   direttamente quel file, sia in Explorer che in DxO PhotoLab. Basta
   questo, nessun altro passaggio.
 - **Esegui invece dai sorgenti** (con `venv`, senza aver generato l'exe):
@@ -139,7 +145,7 @@ dipende da come usi il programma:
 
 **Su Windows, per impostare "Apri con...":**
 1. Tasto destro su un file `.CR3` → **Apri con** → **Scegli un'altra app**
-2. Sfoglia fino a `CanonAFPointViewer.exe` (o `apri_con.bat` se usi i sorgenti)
+2. Sfoglia fino a `AFocusPoint.exe` (o `apri_con.bat` se usi i sorgenti)
 3. Se vuoi che diventi il programma predefinito per i CR3, spunta l'opzione
    corrispondente; altrimenti resterà disponibile nel menu "Apri con" ogni volta
 
@@ -150,20 +156,26 @@ stesso file.
 ## Struttura del progetto
 
 ```
-canon_af_point_viewer/
+AFocusPoint/
 ├── main.py                    # avvio dell'app (gestisce anche "Apri con...")
 ├── avvia.bat                  # avvio comodo Windows (doppio click)
 ├── apri_con.bat                # wrapper per "Apri con..."/DxO se usi i sorgenti
-├── build_windows.bat          # genera CanonAFPointViewer.exe
-├── build_mac.sh                # genera Canon AF Point Viewer.app
+├── build_windows.bat          # genera AFocusPoint.exe
+├── build_mac.sh                # genera AFocusPoint.app
 ├── core/
 │   ├── exif_reader.py         # wrapper attorno a ExifTool
 │   ├── af_parser.py           # interpreta i tag in dati strutturati
 │   ├── preview_extractor.py   # estrae l'anteprima JPEG dal CR3
-│   └── overlay_renderer.py    # disegna i punti AF sull'anteprima
+│   ├── dop_parser.py          # legge ritaglio/rotazione dal sidecar .dop di PhotoLab
+│   ├── geometry.py            # matematica di rotazione/ritaglio/scala (pura)
+│   ├── image_ops.py           # applica orientamento/ritaglio all'anteprima
+│   ├── overlay_renderer.py    # disegna i punti AF sull'anteprima
+│   ├── sharpness.py           # confronto di nitidezza (indicativo)
+│   └── frame_builder.py       # orchestratore: metadati -> geometria -> disegno
 ├── gui/
-│   ├── main_window.py         # finestra principale
-│   └── info_panel.py          # pannello con dati di scatto e AF
+│   ├── main_window.py         # finestra principale (con zoom/pan)
+│   ├── zoom.py                # matematica dello zoom (pura)
+│   └── info_panel.py          # pannello con dati di scatto, AF e avvisi
 └── tools/
     └── inspect_tags.py        # script di calibrazione (vedi sopra)
 ```
