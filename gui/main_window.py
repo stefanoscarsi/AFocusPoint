@@ -2,7 +2,7 @@
 main_window.py
 --------------
 Finestra principale: menu per aprire un CR3, visualizzatore immagine con
-overlay AF a sinistra, pannello informazioni a destra.
+overlay AF a sinistra (con zoom/pan), pannello informazioni a destra.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL.ImageQt import ImageQt
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QPoint, Qt
 from PySide6.QtGui import QAction, QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
@@ -22,8 +22,35 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from core import af_parser, exif_reader, overlay_renderer, preview_extractor
+from core import exif_reader, frame_builder
+from gui import zoom as zoom_utils
 from gui.info_panel import InfoPanel
+
+
+class _ZoomableImageLabel(QLabel):
+    """A QLabel that forwards wheel/mouse events to the owning window, which
+    holds the actual zoom/pan state (the label itself is just the paint
+    surface)."""
+
+    def __init__(self, window: "MainWindow"):
+        super().__init__()
+        self._window = window
+
+    def wheelEvent(self, event) -> None:  # noqa: N802 - override Qt
+        self._window._on_wheel(event)
+
+    def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802 - override Qt
+        self._window._reset_zoom()
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802 - override Qt
+        if event.button() == Qt.LeftButton:
+            self._window._on_drag_start(event.pos())
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802 - override Qt
+        if event.buttons() & Qt.LeftButton:
+            self._window._on_drag_move(event.pos())
+        super().mouseMoveEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -33,6 +60,9 @@ class MainWindow(QMainWindow):
         self.resize(1200, 800)
 
         self._current_pixmap: QPixmap | None = None  # sempre a piena risoluzione
+        self._zoom: float = zoom_utils.MIN_ZOOM
+        self._drag_start: QPoint | None = None
+        self._drag_start_scroll: tuple[int, int] = (0, 0)
 
         self._build_menu()
         self._build_layout()
@@ -55,7 +85,8 @@ class MainWindow(QMainWindow):
         central = QWidget()
         layout = QHBoxLayout(central)
 
-        self.image_label = QLabel("Apri un file CR3 (File → Apri CR3...)")
+        self.image_label = _ZoomableImageLabel(self)
+        self.image_label.setText("Apri un file CR3 (File → Apri CR3...)")
         self.image_label.setAlignment(Qt.AlignCenter)
         self.image_label.setMinimumSize(400, 400)
 
@@ -81,7 +112,7 @@ class MainWindow(QMainWindow):
     def resizeEvent(self, event) -> None:  # noqa: N802 - override Qt
         super().resizeEvent(event)
         # Ridisegna l'immagine adattata ogni volta che la finestra cambia
-        # dimensione, cosi' resta sempre visibile tutta intera.
+        # dimensione, cosi' resta coerente con lo zoom corrente.
         self._update_displayed_pixmap()
 
     # ------------------------------------------------------------------
@@ -98,15 +129,11 @@ class MainWindow(QMainWindow):
     def load_file(self, file_path: str) -> None:
         path = Path(file_path)
         try:
-            metadata = exif_reader.read_all_metadata(path)
-            shooting = af_parser.get_shooting_data(metadata["formatted"])
-            af_data = af_parser.get_af_data_structured(metadata["raw"], metadata["formatted"])
+            result = frame_builder.build_frame(path)
 
-            preview = preview_extractor.extract_preview_image(path)
-            preview_with_overlay = overlay_renderer.draw_af_overlay(preview, af_data)
-
-            self._show_image(preview_with_overlay)
-            self.info_panel.update_data(shooting, af_data)
+            self._reset_zoom_state()
+            self._show_image(result.image)
+            self.info_panel.update_data(result)
             self.statusBar().showMessage(f"Caricato: {path.name}")
 
         except Exception as exc:  # noqa: BLE001 - vogliamo mostrare l'errore, non crashare
@@ -119,9 +146,8 @@ class MainWindow(QMainWindow):
     def _show_image(self, pil_image) -> None:
         # Conserviamo SEMPRE il pixmap a piena risoluzione: e' quello su cui
         # e' stato disegnato l'overlay AF in scala 1:1. Cio' che mostriamo a
-        # schermo e' invece una copia ridotta per adattarsi alla finestra
-        # (calcolata in _update_displayed_pixmap), cosi' l'immagine intera è
-        # sempre visibile senza dover scorrere.
+        # schermo e' invece una copia ridotta/ingrandita in base allo zoom
+        # corrente (calcolata in _update_displayed_pixmap).
         qt_image = ImageQt(pil_image)
         self._current_pixmap = QPixmap.fromImage(qt_image)
         self._update_displayed_pixmap()
@@ -132,7 +158,96 @@ class MainWindow(QMainWindow):
         viewport_size = self.image_scroll.viewport().size()
         if viewport_size.width() <= 0 or viewport_size.height() <= 0:
             return
-        scaled = self._current_pixmap.scaled(
-            viewport_size, Qt.KeepAspectRatio, Qt.SmoothTransformation
-        )
+
+        if self._zoom <= zoom_utils.MIN_ZOOM:
+            # Vista adattata (comportamento originale): la QScrollArea
+            # ridimensiona da sola il contenuto, niente scrollbar necessarie.
+            self.image_scroll.setWidgetResizable(True)
+            scaled = self._current_pixmap.scaled(
+                viewport_size, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+        else:
+            # Zoomati: disabilitiamo il resize automatico cosi' la label puo'
+            # essere piu' grande del viewport, e la QScrollArea mostra le
+            # scrollbar per scorrere/panoramicare.
+            self.image_scroll.setWidgetResizable(False)
+            fit_scale = zoom_utils.compute_fit_scale(
+                (self._current_pixmap.width(), self._current_pixmap.height()),
+                (viewport_size.width(), viewport_size.height()),
+            )
+            scale = fit_scale * self._zoom
+            target_w = max(1, int(self._current_pixmap.width() * scale))
+            target_h = max(1, int(self._current_pixmap.height() * scale))
+            scaled = self._current_pixmap.scaled(
+                target_w, target_h, Qt.KeepAspectRatio, Qt.SmoothTransformation
+            )
+
         self.image_label.setPixmap(scaled)
+        self.image_label.resize(scaled.size())
+
+    # ------------------------------------------------------------------
+    # Zoom / pan
+    # ------------------------------------------------------------------
+
+    def _reset_zoom_state(self) -> None:
+        self._zoom = zoom_utils.MIN_ZOOM
+        self._drag_start = None
+
+    def _reset_zoom(self) -> None:
+        self._reset_zoom_state()
+        self._update_displayed_pixmap()
+
+    def _on_wheel(self, event) -> None:
+        if self._current_pixmap is None:
+            return
+        delta = event.angleDelta().y()
+        if delta == 0:
+            return
+        factor = zoom_utils.ZOOM_STEP if delta > 0 else (1 / zoom_utils.ZOOM_STEP)
+        self._zoom_at(event.position().toPoint(), factor)
+
+    def _zoom_at(self, viewport_pos: QPoint, factor: float) -> None:
+        new_zoom = zoom_utils.clamp_zoom(self._zoom * factor)
+        if new_zoom == self._zoom:
+            return
+
+        old_pixmap = self.image_label.pixmap()
+        hbar = self.image_scroll.horizontalScrollBar()
+        vbar = self.image_scroll.verticalScrollBar()
+
+        # The image point currently under the cursor, expressed as a
+        # fraction of the (pre-zoom) displayed pixmap -- kept fixed on
+        # screen across the zoom change so zooming feels anchored to the
+        # cursor rather than always recentring on the photo's middle.
+        if old_pixmap is not None and not old_pixmap.isNull():
+            old_x = hbar.value() + viewport_pos.x()
+            old_y = vbar.value() + viewport_pos.y()
+            frac_x = old_x / max(old_pixmap.width(), 1)
+            frac_y = old_y / max(old_pixmap.height(), 1)
+        else:
+            frac_x = frac_y = 0.5
+
+        self._zoom = new_zoom
+        self._update_displayed_pixmap()
+
+        new_pixmap = self.image_label.pixmap()
+        if new_pixmap is not None and not new_pixmap.isNull():
+            new_x = frac_x * new_pixmap.width() - viewport_pos.x()
+            new_y = frac_y * new_pixmap.height() - viewport_pos.y()
+            hbar.setValue(int(new_x))
+            vbar.setValue(int(new_y))
+
+    def _on_drag_start(self, pos: QPoint) -> None:
+        self._drag_start = pos
+        self._drag_start_scroll = (
+            self.image_scroll.horizontalScrollBar().value(),
+            self.image_scroll.verticalScrollBar().value(),
+        )
+
+    def _on_drag_move(self, pos: QPoint) -> None:
+        if self._zoom <= zoom_utils.MIN_ZOOM or self._drag_start is None:
+            return  # the whole photo already fits -- nothing to pan into
+        dx = pos.x() - self._drag_start.x()
+        dy = pos.y() - self._drag_start.y()
+        self.image_scroll.horizontalScrollBar().setValue(self._drag_start_scroll[0] - dx)
+        self.image_scroll.verticalScrollBar().setValue(self._drag_start_scroll[1] - dy)

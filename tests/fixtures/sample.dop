@@ -1,0 +1,39 @@
+Sidecar = {
+Date = "2026-07-05T16:56:48.8897120Z",
+Software = "DxO PhotoLab 9.9.1",
+Source = {
+Items = {
+{
+Name = "sample.CR3",
+Orientation = 1,
+Settings = {
+Base = {
+CropActive = false,
+CropAuto = true,
+CropRatio = 0,
+CropRect = {
+0,
+0,
+1,
+1,
+}
+,
+FramingActive = false,
+FramingScaleFactor = 0.25,
+KeystoningHorizonActive = false,
+KeystoningHorizon = 0,
+KeystoningActive = false,
+KeystoningUpDown = 0,
+AnamorphosisActive = false,
+AnamorphosisType = "Spherical",
+}
+,
+}
+,
+}
+,
+}
+,
+}
+,
+}

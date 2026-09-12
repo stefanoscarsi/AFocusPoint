@@ -4,6 +4,8 @@ info_panel.py
 Pannello laterale con due sezioni:
   - Dati di scatto (camera, esposizione, obiettivo...)
   - Dati di autofocus (modalita', punti usati, punto primario...)
+Piu' un'area avvisi/indicazioni (AF ambiguo, ritaglio/rotazione non
+gestibile, confronto di nitidezza).
 """
 
 from __future__ import annotations
@@ -11,7 +13,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QWidget
 
-from core.af_parser import AFData, ShootingData
+from core.frame_builder import SHARPNESS_CAVEAT, FrameResult
 
 
 def _row(label: str, value) -> str:
@@ -42,6 +44,7 @@ class InfoPanel(QWidget):
         self.af_box.setLayout(af_layout)
 
         self.warning_label = QLabel("")
+        self.warning_label.setTextFormat(Qt.PlainText)
         self.warning_label.setWordWrap(True)
         self.warning_label.setStyleSheet("color: #b35c00;")
 
@@ -50,7 +53,10 @@ class InfoPanel(QWidget):
         layout.addWidget(self.warning_label)
         layout.addStretch(1)
 
-    def update_data(self, shooting: ShootingData, af: AFData) -> None:
+    def update_data(self, result: FrameResult) -> None:
+        shooting = result.shooting
+        af = result.af_data
+
         shooting_lines = [
             _row("Fotocamera", shooting.camera_model),
             _row("Obiettivo", shooting.lens),
@@ -76,19 +82,44 @@ class InfoPanel(QWidget):
         ]
         self.af_label.setText("<br>".join(af_lines))
 
+        self.warning_label.setText(self._build_warning_text(result))
+
+    @staticmethod
+    def _build_warning_text(result: FrameResult) -> str:
+        af = result.af_data
+        messages: list[str] = []
+
         if not af.points:
             if af.candidate_area_count and af.candidate_area_count > 1:
-                self.warning_label.setText(
+                messages.append(
                     "⚠ La fotocamera ha valutato piu' aree candidate ma questo "
                     "file non specifica quale abbia raggiunto la conferma di "
                     "fuoco. Mostrata solo la zona di ricerca complessiva "
                     "(rettangolo blu), non un punto preciso."
                 )
             else:
-                self.warning_label.setText(
+                messages.append(
                     "⚠ Nessuna coordinata AF interpretata con il mapping attuale.\n"
                     "Esegui tools/inspect_tags.py su questo file per vedere i tag "
                     "grezzi disponibili e aggiornare core/af_parser.py di conseguenza."
                 )
-        else:
-            self.warning_label.setText("")
+
+        if result.geometry_warning:
+            messages.append(f"⚠ {result.geometry_warning}")
+
+        if result.af_sharpness is not None and result.best_sharpness is not None:
+            if result.sharpness_matches:
+                messages.append(
+                    f"Nitidezza nel punto AF: {result.af_sharpness:.0f} — "
+                    "corrisponde all'area piu' nitida della foto (buon "
+                    "posizionamento del fuoco)."
+                )
+            else:
+                messages.append(
+                    f"Nitidezza nel punto AF: {result.af_sharpness:.0f}   contro "
+                    f"{result.best_sharpness:.0f} nell'area piu' nitida della foto "
+                    "(riquadro blu)."
+                )
+            messages.append(SHARPNESS_CAVEAT)
+
+        return "\n\n".join(messages)
