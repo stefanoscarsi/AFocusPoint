@@ -6,12 +6,16 @@ Avvio con un file gia' aperto: python3 main.py "percorso/foto.CR3"
 (e' questo il meccanismo usato da Windows/DxO PhotoLab quando l'app viene
 aperta tramite "Apri con..." o come editor esterno: il sistema operativo
 passa il percorso del file come argomento da riga di comando).
+
+Su macOS invece il Finder ("Apri con...", doppio click, trascinamento sull'
+icona nel Dock) NON passa il file come argomento: manda all'app un evento
+di apertura file (QFileOpenEvent), gestito da AFocusPointApp qui sotto.
 """
 
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QEvent, QTimer
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
@@ -30,8 +34,47 @@ def resource_path(relative_path: str) -> Path:
     return base / relative_path
 
 
+class AFocusPointApp(QApplication):
+    """
+    Riceve i file aperti dal Finder su macOS. L'evento puo' arrivare sia
+    all'avvio (l'app e' stata lanciata PER aprire quel file) sia con l'app
+    gia' aperta (in quel caso si carica la nuova foto nella stessa
+    finestra). Su Windows questo evento non arriva mai: li' il file passa
+    da sys.argv, gestito in main().
+    """
+
+    def __init__(self, argv: list[str]):
+        super().__init__(argv)
+        self._window: MainWindow | None = None
+        self._pending_file: str | None = None
+
+    def set_window(self, window: MainWindow) -> None:
+        self._window = window
+        if self._pending_file:
+            self._open_file(self._pending_file)
+            self._pending_file = None
+
+    def event(self, event) -> bool:  # noqa: N802 - override Qt
+        if event.type() == QEvent.FileOpen:
+            if self._window is None:
+                self._pending_file = event.file()
+            else:
+                self._open_file(event.file())
+            return True
+        return super().event(event)
+
+    def _open_file(self, file_path: str) -> None:
+        window = self._window
+        window.raise_()
+        window.activateWindow()
+        # Rimandato al ciclo eventi, come per sys.argv in main(): load_file
+        # puo' mostrare una finestra di errore, che non va aperta mentre Qt
+        # sta ancora consegnando questo evento.
+        QTimer.singleShot(0, lambda: window.load_file(file_path))
+
+
 def main() -> None:
-    app = QApplication(sys.argv)
+    app = AFocusPointApp(sys.argv)
 
     # Icona dell'applicazione: usata nella barra del titolo, nella barra
     # delle applicazioni (taskbar) e nel dock (Mac) MENTRE il programma e'
@@ -45,6 +88,7 @@ def main() -> None:
 
     window = MainWindow()
     window.show()
+    app.set_window(window)
 
     # Se l'app e' stata avviata da "Apri con..." (Esplora File, DxO
     # PhotoLab come editor esterno, ecc.), il sistema operativo passa il

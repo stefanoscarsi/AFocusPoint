@@ -18,8 +18,8 @@ from __future__ import annotations
 from pathlib import Path
 
 from PIL.ImageQt import ImageQt
-from PySide6.QtCore import QRectF, Qt
-from PySide6.QtGui import QAction, QPainter, QPixmap
+from PySide6.QtCore import QEvent, QRectF, Qt
+from PySide6.QtGui import QAction, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
     QGraphicsItem,
@@ -33,14 +33,24 @@ from PySide6.QtWidgets import (
 )
 
 from core import exif_reader, frame_builder
+from gui import af_overlay
 from gui import zoom as zoom_utils
 from gui.info_panel import InfoPanel
 
 
 class _ZoomableGraphicsView(QGraphicsView):
-    """Forwards wheel/double-click events to the owning window, which holds
-    the actual zoom state. Panning itself needs no wiring at all: ScrollHandDrag
-    is Qt's built-in drag-to-pan mode."""
+    """Forwards wheel/pinch/double-click events to the owning window, which
+    holds the actual zoom state. Panning itself needs no wiring at all:
+    ScrollHandDrag is Qt's built-in drag-to-pan mode, and QGraphicsView's own
+    wheelEvent scrolls the view.
+
+    Input mapping:
+      - mouse wheel                -> zoom (Windows and Mac, as before)
+      - trackpad two-finger scroll -> pan, like every Mac app
+      - Cmd/Ctrl + scroll          -> zoom, also from a trackpad
+      - trackpad pinch             -> zoom (macOS native gesture)
+      - double click / two-finger double tap -> back to fit-to-view
+    """
 
     def __init__(self, window: "MainWindow"):
         super().__init__()
@@ -57,11 +67,41 @@ class _ZoomableGraphicsView(QGraphicsView):
         self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
 
     def wheelEvent(self, event) -> None:  # noqa: N802 - override Qt
+        # Only a trackpad (or Magic Mouse) reports a pixel delta: Qt provides
+        # it on macOS, while on Windows it's always null, so this branch
+        # never changes the Windows behaviour. ControlModifier is the Cmd key
+        # on macOS (Qt swaps the two there).
+        is_trackpad_scroll = not event.pixelDelta().isNull()
+        if is_trackpad_scroll and not event.modifiers() & Qt.ControlModifier:
+            super().wheelEvent(event)
+            return
         self._window._on_wheel(event)
+
+    def viewportEvent(self, event) -> bool:  # noqa: N802 - override Qt
+        # Native gestures arrive on the viewport (the widget under the
+        # fingers), not on the view itself. They only exist on macOS.
+        if event.type() == QEvent.NativeGesture:
+            if event.gestureType() == Qt.ZoomNativeGesture:
+                self._window._zoom_by(zoom_utils.pinch_zoom_factor(event.value()))
+                return True
+            if event.gestureType() == Qt.SmartZoomNativeGesture:
+                self._window._reset_zoom()
+                return True
+        return super().viewportEvent(event)
 
     def mouseDoubleClickEvent(self, event) -> None:  # noqa: N802 - override Qt
         self._window._reset_zoom()
         super().mouseDoubleClickEvent(event)
+
+
+def _show_message(parent, icon, title: str, text: str) -> None:
+    """Come QMessageBox.warning/critical, ma il testo e' sempre testo
+    semplice: contiene nomi di file ed errori che arrivano dal file aperto,
+    e con il formato automatico Qt lo interpreterebbe come HTML quando
+    "sembra" HTML."""
+    box = QMessageBox(icon, title, text, QMessageBox.Ok, parent)
+    box.setTextFormat(Qt.PlainText)
+    box.exec()
 
 
 class MainWindow(QMainWindow):
@@ -94,6 +134,25 @@ class MainWindow(QMainWindow):
         file_menu = self.menuBar().addMenu("&File")
         file_menu.addAction(open_action)
 
+        # Keyboard zoom: Ctrl+/Ctrl- on Windows, Cmd+/Cmd- on Mac -- handy
+        # with a Magic Mouse, which has no wheel and no pinch.
+        zoom_in_action = QAction("Ingrandisci", self)
+        zoom_in_action.setShortcut(QKeySequence.ZoomIn)
+        zoom_in_action.triggered.connect(lambda: self._zoom_by(zoom_utils.ZOOM_STEP, around_center=True))
+
+        zoom_out_action = QAction("Riduci", self)
+        zoom_out_action.setShortcut(QKeySequence.ZoomOut)
+        zoom_out_action.triggered.connect(lambda: self._zoom_by(1 / zoom_utils.ZOOM_STEP, around_center=True))
+
+        fit_action = QAction("Adatta alla finestra", self)
+        fit_action.setShortcut("Ctrl+0")
+        fit_action.triggered.connect(self._reset_zoom)
+
+        view_menu = self.menuBar().addMenu("&Vista")
+        view_menu.addAction(zoom_in_action)
+        view_menu.addAction(zoom_out_action)
+        view_menu.addAction(fit_action)
+
     def _build_layout(self) -> None:
         central = QWidget()
         layout = QHBoxLayout(central)
@@ -108,6 +167,7 @@ class MainWindow(QMainWindow):
         # made dragging feel heavy/sluggish on a large RAW preview.
         self.pixmap_item.setCacheMode(QGraphicsItem.DeviceCoordinateCache)
         self.scene.addItem(self.pixmap_item)
+        self._overlay_items: list[QGraphicsItem] = []
 
         self.image_view = _ZoomableGraphicsView(self)
         self.image_view.setScene(self.scene)
@@ -125,7 +185,7 @@ class MainWindow(QMainWindow):
             version = exif_reader.check_exiftool_available()
             self.statusBar().showMessage(f"ExifTool {version} pronto.")
         except exif_reader.ExifToolNotFoundError as exc:
-            QMessageBox.critical(self, "ExifTool non trovato", str(exc))
+            _show_message(self, QMessageBox.Critical, "ExifTool non trovato", str(exc))
 
     def resizeEvent(self, event) -> None:  # noqa: N802 - override Qt
         super().resizeEvent(event)
@@ -150,21 +210,29 @@ class MainWindow(QMainWindow):
         path = Path(file_path)
         try:
             result = frame_builder.build_frame(path)
-            self._show_image(result.image)
+            self._show_frame(result)
             self.info_panel.update_data(result)
             self.statusBar().showMessage(f"Caricato: {path.name}")
 
         except Exception as exc:  # noqa: BLE001 - vogliamo mostrare l'errore, non crashare
-            QMessageBox.warning(
+            _show_message(
                 self,
+                QMessageBox.Warning,
                 "Errore nel caricamento del file",
                 f"Non sono riuscito a elaborare '{path.name}':\n\n{exc}",
             )
 
-    def _show_image(self, pil_image) -> None:
-        qt_image = ImageQt(pil_image)
+    def _show_frame(self, result: frame_builder.FrameResult) -> None:
+        qt_image = ImageQt(result.image)
         pixmap = QPixmap.fromImage(qt_image)
         self.pixmap_item.setPixmap(pixmap)
+
+        for item in self._overlay_items:
+            self.scene.removeItem(item)
+        self._overlay_items = af_overlay.build_items(result)
+        for item in self._overlay_items:
+            self.scene.addItem(item)
+
         self.scene.setSceneRect(QRectF(pixmap.rect()))
         self._fit_to_view()
 
@@ -192,12 +260,14 @@ class MainWindow(QMainWindow):
         self._fit_to_view()
 
     def _on_wheel(self, event) -> None:
-        if self.pixmap_item.pixmap().isNull():
-            return
         delta = event.angleDelta().y()
         if delta == 0:
             return
-        factor = zoom_utils.ZOOM_STEP if delta > 0 else (1 / zoom_utils.ZOOM_STEP)
+        self._zoom_by(zoom_utils.wheel_zoom_factor(delta))
+
+    def _zoom_by(self, factor: float, around_center: bool = False) -> None:
+        if self.pixmap_item.pixmap().isNull():
+            return
 
         max_zoom = zoom_utils.max_zoom_for_base_scale(self._base_scale)
         new_zoom = min(max(self._zoom * factor, zoom_utils.MIN_ZOOM), max_zoom)
@@ -207,8 +277,13 @@ class MainWindow(QMainWindow):
         # QGraphicsView.scale() multiplies the CURRENT transform, so only
         # the relative step is needed -- AnchorUnderMouse (set in
         # _ZoomableGraphicsView) keeps the point under the cursor fixed on
-        # screen across the change.
+        # screen across the change. Keyboard zoom has no meaningful "point under the mouse" (the cursor
+        # may well be outside the view), so it zooms around the view center.
         step = new_zoom / self._zoom
         self._zoom = new_zoom
+        if around_center:
+            self.image_view.setTransformationAnchor(QGraphicsView.AnchorViewCenter)
         self.image_view.scale(step, step)
+        if around_center:
+            self.image_view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         self._update_drag_mode()

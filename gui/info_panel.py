@@ -10,6 +10,8 @@ gestibile).
 
 from __future__ import annotations
 
+import html
+
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import QGroupBox, QLabel, QVBoxLayout, QWidget
 
@@ -17,7 +19,11 @@ from core.frame_builder import FrameResult
 
 
 def _row(label: str, value) -> str:
-    value_str = "—" if value in (None, "") else str(value)
+    # Le etichette sono rich text (grassetto): i valori EXIF, scritti da
+    # chiunque abbia modificato il file, vanno invece protetti, altrimenti
+    # un "<" in un campo come Modello o Obiettivo verrebbe interpretato come
+    # HTML e potrebbe alterare cio' che il pannello mostra.
+    value_str = "—" if value in (None, "") else html.escape(str(value))
     return f"<b>{label}:</b> {value_str}"
 
 

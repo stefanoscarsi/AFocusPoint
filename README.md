@@ -5,7 +5,7 @@ App desktop (Windows/Mac/Linux) che legge un file RAW e mostra:
 - il tipo di AF usato (modalità area AF, One-Shot/Servo, punti usati)
 - il/i punto/i di messa a fuoco sovrapposti all'anteprima della foto,
   posizionati correttamente anche su foto ritagliate/ruotate in DxO PhotoLab
-- zoom sull'anteprima (rotellina del mouse, trascinamento per spostarsi)
+- zoom sull'anteprima (vedi [Comandi di zoom](#comandi-di-zoom))
 
 > **Funziona ed è stato testato solo con fotocamere Canon** (formato CR3 e
 > metadati MakerNotes Canon). Pensata inizialmente per la **Canon EOS R6
@@ -86,12 +86,26 @@ solo (usa automaticamente l'ambiente virtuale `venv` se presente). Se
 qualcosa va storto, la finestra nera resta aperta con il messaggio di
 errore invece di chiudersi subito.
 
+**Opzione comoda (Mac): doppio click su `avvia.command`**
+E' l'equivalente Mac di `avvia.bat`: si apre il Terminale e parte l'app
+(usa `venv` se presente). Se l'app non parte, il messaggio di errore resta
+visibile nel Terminale.
+
 **Opzione manuale (da riga di comando):**
 ```bash
 python3 main.py
 ```
 
 Poi `File → Apri CR3...` e seleziona uno scatto.
+
+### Comandi di zoom
+
+| Azione | Windows | Mac |
+|---|---|---|
+| Zoom | rotellina del mouse | rotellina del mouse, pizzico sul trackpad, Cmd + scorrimento |
+| Spostarsi nella foto ingrandita | trascinamento | trascinamento, scorrimento a due dita sul trackpad |
+| Zoom da tastiera | Ctrl + / Ctrl − | Cmd + / Cmd − |
+| Tornare alla foto intera | doppio click, Ctrl+0 | doppio click, doppio tocco a due dita, Cmd+0 |
 
 ## 4. (Opzionale) Creare un vero eseguibile standalone
 
@@ -122,13 +136,18 @@ trasferito il `.dmg` da un altro computer e macOS lo blocca del tutto, togli
 la quarantena con `xattr -dr com.apple.quarantine /Applications/AFocusPoint.app`.
 
 Serve Python 3.10 o superiore (`brew install python`) ed ExifTool
-(`brew install exiftool`).
+(`brew install exiftool`). Tutte le impostazioni dell'app Mac (compresa
+l'associazione ai file CR3) sono in `AFocusPoint-mac.spec`; `AFocusPoint.spec`
+e' invece quello generato dalla build Windows.
 
 **Da sapere:**
-- Il file generato è grande (200-350 MB circa): include l'intero framework
-  grafico Qt, è normale per un'app PySide6 standalone.
+- Il file generato è grande (200-350 MB circa l'exe Windows, circa 115 MB
+  l'app Mac): include il framework grafico Qt, è normale per un'app PySide6
+  standalone.
 - **ExifTool resta comunque necessario a parte**, installato nel PATH di
-  sistema come descritto sopra: non è incluso dentro l'exe/app. Se in
+  sistema come descritto sopra: non è incluso dentro l'exe/app. Su Mac
+  l'app lo trova anche quando è aperta dal Finder o dal Dock, se installato
+  con Homebrew o con il pacchetto ufficiale di exiftool.org. Se in
   futuro vuoi condividere l'app con altre persone senza fargli installare
   ExifTool separatamente, fammelo sapere: si può impacchettare anche
   quello, ma richiede un passaggio in più in fase di build.
@@ -160,15 +179,34 @@ dipende da come usi il programma:
 configurare un "editor esterno" (external editor) e punta anche lì allo
 stesso file.
 
+### Su Mac
+
+Su Mac "Apri con..." funziona solo con l'app generata al punto 4 (non dai
+sorgenti), dopo averla trascinata in Applicazioni:
+
+1. Tasto destro (o Ctrl+click) su un file `.CR3` → **Apri con** →
+   **AFocusPoint**
+2. Per renderla l'app predefinita per i CR3: seleziona un `.CR3` →
+   **Archivio → Ottieni informazioni** → sezione **Apri con** → scegli
+   AFocusPoint → **Modifica tutto...**
+
+Puoi anche trascinare uno o più CR3 sull'icona di AFocusPoint nel Dock.
+Se l'app è già aperta, la nuova foto viene caricata nella stessa finestra.
+
+L'uso come editor esterno di **DxO PhotoLab per Mac** non è ancora stato
+verificato.
+
 ## Struttura del progetto
 
 ```
 AFocusPoint/
 ├── main.py                    # avvio dell'app (gestisce anche "Apri con...")
 ├── avvia.bat                  # avvio comodo Windows (doppio click)
+├── avvia.command              # avvio comodo Mac (doppio click)
 ├── apri_con.bat                # wrapper per "Apri con..."/DxO se usi i sorgenti
 ├── build_windows.bat          # genera AFocusPoint.exe
 ├── build_mac.sh                # genera AFocusPoint.app + AFocusPoint.dmg
+├── AFocusPoint-mac.spec       # impostazioni della build Mac (usato da build_mac.sh)
 ├── core/
 │   ├── exif_reader.py         # wrapper attorno a ExifTool
 │   ├── af_parser.py           # interpreta i tag in dati strutturati
@@ -176,10 +214,10 @@ AFocusPoint/
 │   ├── dop_parser.py          # legge ritaglio/rotazione dal sidecar .dop di PhotoLab
 │   ├── geometry.py            # matematica di rotazione/ritaglio/scala (pura)
 │   ├── image_ops.py           # applica orientamento/ritaglio all'anteprima
-│   ├── overlay_renderer.py    # disegna i punti AF sull'anteprima
-│   └── frame_builder.py       # orchestratore: metadati -> geometria -> disegno
+│   └── frame_builder.py       # orchestratore: metadati -> geometria -> riquadri AF
 ├── gui/
 │   ├── main_window.py         # finestra principale (con zoom/pan)
+│   ├── af_overlay.py          # disegna i riquadri AF sopra la foto
 │   ├── zoom.py                # matematica dello zoom (pura)
 │   └── info_panel.py          # pannello con dati di scatto, AF e avvisi
 └── tools/

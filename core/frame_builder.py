@@ -1,7 +1,13 @@
 """Orchestrates the full pipeline for one CR3: read metadata, extract the
 preview, apply PhotoLab's crop/rotation (if any), and work out where the AF
-point(s) land on the final image before drawing them. Pulled out of
-gui/main_window.py so it can be tested without Qt.
+point(s) land on the final image. Pulled out of gui/main_window.py so it can
+be tested without Qt.
+
+The boxes are returned as coordinates, NOT painted into the image: the
+viewer draws them on top (gui/af_overlay.py) with a fixed on-screen line
+width. Painted into a 6960 px wide preview, a 3 px line almost vanished
+once the photo was scaled down to fit the window (~12%): scaling skips most
+of its pixel rows, leaving just one stray side of the square visible.
 
 A sharpness-based "is this really the sharpest area?" cross-check used to
 live here too. It was removed: even after fixing a real measurement bias
@@ -15,12 +21,12 @@ this way just isn't reliable enough to show as a feature -- see git history
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from PIL import Image
 
-from . import af_parser, dop_parser, exif_reader, geometry, image_ops, overlay_renderer, preview_extractor
+from . import af_parser, dop_parser, exif_reader, geometry, image_ops, preview_extractor
 
 # Orientations image_ops.apply_orientation / geometry.rotate_point can handle.
 # Mirrored EXIF values (2/4/5/7) are effectively never produced by Canon RAWs;
@@ -32,11 +38,24 @@ _UNSUPPORTED_CORRECTION_WARNING = "Posizione non garantita — correzione prospe
 _CLIPPED_BY_CROP_WARNING = "Il punto AF cade fuori dall'area ritagliata"
 
 
+@dataclass(frozen=True)
+class AFBox:
+    """One AF point, in pixel coordinates of FrameResult.image."""
+    box: geometry.Box
+    # The camera's primary point (drawn red), as opposed to any other point
+    # confirmed in focus (drawn green).
+    is_primary: bool
+
+
 @dataclass
 class FrameResult:
     image: Image.Image
     shooting: af_parser.ShootingData
     af_data: af_parser.AFData
+    af_boxes: list[AFBox] = field(default_factory=list)
+    # Overall search zone (drawn thin blue), shown as context when the
+    # camera evaluated multiple candidate areas.
+    search_zone_box: geometry.Box | None = None
     # Set only when geometry (crop/rotation/perspective) prevented placing a
     # box confidently -- independent of af_parser's own "ambiguous AF" case,
     # which info_panel already reports from af_data.points being empty.
@@ -128,25 +147,22 @@ def build_frame(raw_path: str | Path) -> FrameResult:
             geometry_warning=_UNSUPPORTED_CORRECTION_WARNING,
         )
 
-    display_boxes: list[tuple[geometry.Box, tuple[int, int, int]]] = []
+    af_boxes: list[AFBox] = []
     for idx, point in enumerate(af_data.points):
         box = _display_box_for_point(point, af_data, geom, target_size)
         if box is None:
             continue
-        color = overlay_renderer.COLOR_PRIMARY if idx == af_data.primary_point_index else overlay_renderer.COLOR_IN_FOCUS
-        display_boxes.append((box, color))
+        af_boxes.append(AFBox(box=box, is_primary=idx == af_data.primary_point_index))
 
     geometry_warning = None
-    if af_data.points and not display_boxes:
+    if af_data.points and not af_boxes:
         geometry_warning = _CLIPPED_BY_CROP_WARNING
 
-    search_zone_box = _display_box_for_search_zone(af_data, geom, target_size)
-
-    annotated = overlay_renderer.draw_af_points(cropped, display_boxes, search_zone_box)
-
     return FrameResult(
-        image=annotated,
+        image=cropped.convert("RGB"),
         shooting=shooting,
         af_data=af_data,
+        af_boxes=af_boxes,
+        search_zone_box=_display_box_for_search_zone(af_data, geom, target_size),
         geometry_warning=geometry_warning,
     )

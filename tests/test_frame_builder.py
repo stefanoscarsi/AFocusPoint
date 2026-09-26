@@ -1,6 +1,6 @@
 from PIL import Image
 
-from core import frame_builder, overlay_renderer
+from core import frame_builder
 
 
 def _af_tags(x=0, y=0, w=100, h=100, ref=(400, 300), valid=1):
@@ -81,12 +81,8 @@ def test_unsupported_correction_returns_warning_and_no_boxes(monkeypatch, tmp_pa
     result = frame_builder.build_frame(raw_path)
 
     assert result.geometry_warning == frame_builder._UNSUPPORTED_CORRECTION_WARNING
-    # No box color anywhere on the (otherwise flat black) image.
-    pixels = result.image.load()
-    w, h = result.image.size
-    assert not any(
-        pixels[x, y] == overlay_renderer.COLOR_IN_FOCUS for y in range(0, h, 5) for x in range(0, w, 5)
-    )
+    assert result.af_boxes == []
+    assert result.search_zone_box is None
 
 
 def test_confirmed_single_af_point_draws_box(monkeypatch, tmp_path):
@@ -101,11 +97,28 @@ def test_confirmed_single_af_point_draws_box(monkeypatch, tmp_path):
     result = frame_builder.build_frame(raw_path)
 
     assert result.geometry_warning is None
-    pixels = result.image.load()
-    w, h = result.image.size
-    assert any(
-        pixels[x, y] == overlay_renderer.COLOR_IN_FOCUS for y in range(0, h, 2) for x in range(0, w, 2)
+    assert len(result.af_boxes) == 1
+    # AF x/y are offsets from the frame center: a 100x100 box at (0, 0) on a
+    # 400x300 frame sits right in the middle.
+    box = result.af_boxes[0].box
+    assert (box.left, box.top, box.right, box.bottom) == (150, 100, 250, 200)
+
+
+def test_af_boxes_are_returned_as_coordinates_not_painted_into_the_image(monkeypatch, tmp_path):
+    """The viewer draws the boxes on top with a fixed on-screen line width;
+    painted into the photo they vanished once it was scaled down to fit."""
+    _stub(
+        monkeypatch,
+        raw_extra=_af_tags(x=0, y=0, w=100, h=100, ref=(400, 300)),
+        formatted_extra={"Canon:AFPointsInFocus": "0"},
     )
+    raw_path = tmp_path / "IMG_0001.CR3"
+    raw_path.touch()
+
+    result = frame_builder.build_frame(raw_path)
+
+    assert result.af_boxes
+    assert result.image.getextrema() == ((0, 0), (0, 0), (0, 0))  # still all black
 
 
 def test_ambiguous_af_with_no_confirmed_point_draws_only_search_zone(monkeypatch, tmp_path):
@@ -125,11 +138,8 @@ def test_ambiguous_af_with_no_confirmed_point_draws_only_search_zone(monkeypatch
     result = frame_builder.build_frame(raw_path)
 
     assert result.af_data.points == []
-    pixels = result.image.load()
-    w, h = result.image.size
-    assert any(
-        pixels[x, y] == overlay_renderer.COLOR_SEARCH_ZONE for y in range(0, h, 2) for x in range(0, w, 2)
-    )
+    assert result.af_boxes == []
+    assert result.search_zone_box is not None
 
 
 def test_af_point_outside_crop_sets_clipped_warning(monkeypatch, tmp_path):

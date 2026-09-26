@@ -3,6 +3,7 @@
 # sviluppato su Windows (dove git converte in CRLF di default), quindi la
 # regola va messa esplicitamente.
 *.sh text eol=lf
+*.command text eol=lf
 
 # I .bat invece vogliono CRLF, altrimenti cmd.exe puo' comportarsi male.
 *.bat text eol=crlf

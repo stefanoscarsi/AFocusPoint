@@ -54,21 +54,15 @@ venv/bin/python3 -m pip install pyinstaller --quiet \
 
 echo ""
 echo "Creo l'app Mac: puo' richiedere qualche minuto e produce un pacchetto"
-echo "abbastanza grande (200-350 MB), perche' include l'intero framework"
-echo "grafico Qt necessario per l'interfaccia. E' normale."
+echo "di circa 115 MB, perche' include il framework grafico Qt necessario"
+echo "per l'interfaccia. E' normale."
 echo ""
 
-# Niente --onefile qui: su macOS il formato nativo e' gia' un bundle .app
-# (una cartella), quindi --onefile aggiungerebbe solo una decompressione ad
-# ogni avvio -- app piu' lenta ad aprirsi, senza alcun vantaggio.
+# Tutte le opzioni (icona, bundle .app, associazione ai file CR3 per
+# "Apri con..." del Finder) sono in AFocusPoint-mac.spec.
 venv/bin/python3 -m PyInstaller \
-    --name "$APP_NAME" \
-    --windowed \
-    --icon "assets/icon.icns" \
-    --add-data "assets/icon.png:assets" \
-    --collect-all PySide6 \
     --noconfirm \
-    main.py \
+    AFocusPoint-mac.spec \
     || fail "La creazione dell'app e' fallita. Copia il messaggio sopra per capire cosa e' successo."
 
 [ -d "dist/${APP_NAME}.app" ] || fail "PyInstaller non ha prodotto dist/${APP_NAME}.app."

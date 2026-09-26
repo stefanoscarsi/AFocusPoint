@@ -29,3 +29,24 @@ def max_zoom_for_base_scale(base_scale: float) -> float:
     if base_scale <= 0:
         return MAX_ZOOM
     return clamp_zoom(MAX_NATIVE_SCALE / base_scale)
+
+
+# One notch of a classic mouse wheel reports an angle delta of 120 (1/8 of a
+# degree per unit, 15 degrees per notch -- a Qt convention).
+WHEEL_NOTCH = 120
+
+
+def wheel_zoom_factor(angle_delta_y: int) -> float:
+    """Zoom multiplier for one wheel event, proportional to how far it
+    scrolled: exactly ZOOM_STEP per notch of a classic mouse wheel, as
+    before, but only a fraction of it for the many small events that a
+    trackpad or high-resolution wheel sends -- a flat ZOOM_STEP per event
+    made Cmd+scroll on a Mac trackpad jump straight to the zoom limit."""
+    return ZOOM_STEP ** (angle_delta_y / WHEEL_NOTCH)
+
+
+def pinch_zoom_factor(gesture_value: float) -> float:
+    """Zoom multiplier for one step of a trackpad pinch (macOS native zoom
+    gesture), whose value is the relative change in size, e.g. +0.02 for
+    "2% bigger". Guarded so a large negative value can't flip the image."""
+    return max(1.0 + gesture_value, 0.1)

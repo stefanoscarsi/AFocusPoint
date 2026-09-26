@@ -40,3 +40,26 @@ def test_max_zoom_for_base_scale_never_below_min_zoom():
 def test_max_zoom_for_base_scale_falls_back_to_flat_ceiling_when_degenerate():
     assert zoom.max_zoom_for_base_scale(0.0) == zoom.MAX_ZOOM
     assert zoom.max_zoom_for_base_scale(-1.0) == zoom.MAX_ZOOM
+
+
+def test_wheel_zoom_factor_is_one_step_per_mouse_wheel_notch():
+    assert abs(zoom.wheel_zoom_factor(120) - zoom.ZOOM_STEP) < 1e-9
+    assert abs(zoom.wheel_zoom_factor(-120) - 1 / zoom.ZOOM_STEP) < 1e-9
+
+
+def test_wheel_zoom_factor_is_a_fraction_of_a_step_for_small_trackpad_deltas():
+    # Ten small trackpad events adding up to one notch zoom exactly as much
+    # as that one notch, instead of ten full steps.
+    total = 1.0
+    for _ in range(10):
+        total *= zoom.wheel_zoom_factor(12)
+    assert abs(total - zoom.ZOOM_STEP) < 1e-9
+
+
+def test_pinch_zoom_factor_follows_the_gesture_value():
+    assert abs(zoom.pinch_zoom_factor(0.05) - 1.05) < 1e-9
+    assert abs(zoom.pinch_zoom_factor(-0.05) - 0.95) < 1e-9
+
+
+def test_pinch_zoom_factor_never_reaches_zero_or_negative():
+    assert zoom.pinch_zoom_factor(-5.0) > 0
