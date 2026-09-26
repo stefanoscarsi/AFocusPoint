@@ -1,0 +1,8 @@
+# Gli script di shell DEVONO avere fine-riga LF: con CRLF macOS e Linux
+# falliscono con "bad interpreter: /bin/bash^M". Questo progetto viene
+# sviluppato su Windows (dove git converte in CRLF di default), quindi la
+# regola va messa esplicitamente.
+*.sh text eol=lf
+
+# I .bat invece vogliono CRLF, altrimenti cmd.exe puo' comportarsi male.
+*.bat text eol=crlf

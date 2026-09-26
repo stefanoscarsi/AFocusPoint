@@ -110,10 +110,19 @@ personalizzata inclusa in `assets/icon.ico`.
 chmod +x build_mac.sh   # solo la prima volta, da' il permesso di esecuzione
 ./build_mac.sh
 ```
-Al termine trovi l'app in `dist/AFocusPoint.app`, con l'icona
-personalizzata inclusa in `assets/icon.icns`, trascinabile in Applicazioni. Al primo avvio macOS potrebbe segnalarla come "app di
-sviluppatore non identificato" (Gatekeeper): tasto destro sull'app → Apri
-→ Apri comunque.
+Lo script fa tutto da solo (crea l'ambiente virtuale se manca, installa le
+dipendenze, compila) e al termine trovi **l'installer `dist/AFocusPoint.dmg`**:
+doppio click e trascina l'app dentro Applicazioni. L'app `dist/AFocusPoint.app`
+resta comunque disponibile se preferisci usarla direttamente.
+
+Al primo avvio macOS potrebbe segnalarla come "app di sviluppatore non
+identificato" (Gatekeeper, perché non è firmata con un account sviluppatore
+Apple a pagamento): tasto destro sull'app → Apri → Apri comunque. Se hai
+trasferito il `.dmg` da un altro computer e macOS lo blocca del tutto, togli
+la quarantena con `xattr -dr com.apple.quarantine /Applications/AFocusPoint.app`.
+
+Serve Python 3.10 o superiore (`brew install python`) ed ExifTool
+(`brew install exiftool`).
 
 **Da sapere:**
 - Il file generato è grande (200-350 MB circa): include l'intero framework
@@ -159,7 +168,7 @@ AFocusPoint/
 ├── avvia.bat                  # avvio comodo Windows (doppio click)
 ├── apri_con.bat                # wrapper per "Apri con..."/DxO se usi i sorgenti
 ├── build_windows.bat          # genera AFocusPoint.exe
-├── build_mac.sh                # genera AFocusPoint.app
+├── build_mac.sh                # genera AFocusPoint.app + AFocusPoint.dmg
 ├── core/
 │   ├── exif_reader.py         # wrapper attorno a ExifTool
 │   ├── af_parser.py           # interpreta i tag in dati strutturati
