@@ -231,6 +231,8 @@ verificato.
 ```
 AFocusPoint/
 ├── main.py                    # avvio dell'app (gestisce anche "Apri con...")
+├── version.py                 # numero di versione (unico punto)
+├── CHANGELOG.md               # cronologia delle versioni
 ├── requirements.txt           # dipendenze per eseguire l'app
 ├── requirements-dev.txt       # + strumenti di sviluppo (pytest, PyInstaller)
 ├── CLAUDE.md                  # note sul progetto per Claude Code

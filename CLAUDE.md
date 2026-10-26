@@ -36,6 +36,11 @@ L'utente scrive in italiano: rispondi in italiano.
 - Un confronto automatico di nitidezza è già stato provato e rimosso perché
   inaffidabile (vedi docstring di `core/frame_builder.py`).
 
+## Versione
+
+- Il numero di versione sta SOLO in `version.py`. Per una release: cambialo lì, aggiorna `CHANGELOG.md`, poi crea il tag git `vX.Y.Z`.
+- È mostrato nel titolo della finestra e in "Informazioni su AFocusPoint"; la build Mac lo mette anche nell'Info.plist.
+
 ## Comandi
 
 - Setup: `python3 -m venv venv` e `venv/bin/pip install -r requirements-dev.txt`

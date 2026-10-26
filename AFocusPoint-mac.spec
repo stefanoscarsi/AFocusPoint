@@ -18,6 +18,11 @@
 # firmare correttamente (i link simbolici di quelle app annidate mandano in
 # errore codesign), cioe' l'app risulta "danneggiata" una volta copiata su
 # un altro Mac.
+# Numero di versione da version.py (unico punto), per il Finder/Info.plist.
+_ns = {}
+exec(open('version.py').read(), _ns)
+APP_VERSION = _ns['__version__']
+
 datas = [('assets/icon.png', 'assets')]
 binaries = []
 hiddenimports = []
@@ -75,7 +80,10 @@ app = BUNDLE(
     name='AFocusPoint.app',
     icon='assets/icon.icns',
     bundle_identifier='com.stefanoscarsi.afocuspoint',
+    version=APP_VERSION,
     info_plist={
+        'CFBundleShortVersionString': APP_VERSION,
+        'CFBundleVersion': APP_VERSION,
         'CFBundleDocumentTypes': [
             {
                 'CFBundleTypeName': 'Canon CR3 RAW',

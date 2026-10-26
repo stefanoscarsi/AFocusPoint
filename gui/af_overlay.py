@@ -37,6 +37,18 @@ CROSS_ARM = 6
 _Z_HALO = 1
 _Z_LINE = 2
 
+# Oltre questo numero di aree a fuoco, il disegno "ricco" (linea spessa +
+# bordo scuro + crocetta per ogni area) diventa un blocco verde pieno che
+# nasconde la foto. Succede nelle modalita' a zona quando la fotocamera
+# conferma a fuoco molte aree insieme (griglia estesa su canneto/alberi).
+# Sopra la soglia disegniamo le STESSE aree, nelle stesse posizioni, ma con
+# una linea sottile e senza crocetta ne' bordo: non togliamo, aggiungiamo o
+# spostiamo nulla -- mostriamo l'impronta reale in modo leggibile. Sotto la
+# soglia (il caso normale, 1-pochi punti) non cambia niente.
+MANY_BOXES_THRESHOLD = 8
+# Linea sottile usata sopra la soglia (screen pixel).
+DENSE_LINE_WIDTH = 1
+
 
 def _pen(color: QColor, width: float) -> QPen:
     pen = QPen(color, width)
@@ -87,8 +99,18 @@ def build_items(result: FrameResult) -> list[QGraphicsItem]:
     items: list[QGraphicsItem] = []
     if result.search_zone_box is not None:
         items += _rect_items(result.search_zone_box, COLOR_SEARCH_ZONE, SEARCH_ZONE_LINE_WIDTH)
+
+    dense = len(result.af_boxes) > MANY_BOXES_THRESHOLD
     for af_box in result.af_boxes:
         color = COLOR_PRIMARY if af_box.is_primary else COLOR_IN_FOCUS
-        items += _rect_items(af_box.box, color, LINE_WIDTH)
-        items += _cross_items(af_box.box, color)
+        if dense:
+            # Tante aree: solo il rettangolo, linea sottile, niente bordo
+            # scuro ne' crocetta -- cosi' la foto resta visibile sotto.
+            rect = QGraphicsRectItem(_rect(af_box.box))
+            rect.setPen(_pen(color, DENSE_LINE_WIDTH))
+            rect.setZValue(_Z_LINE)
+            items.append(rect)
+        else:
+            items += _rect_items(af_box.box, color, LINE_WIDTH)
+            items += _cross_items(af_box.box, color)
     return items

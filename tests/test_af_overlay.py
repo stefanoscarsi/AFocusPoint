@@ -52,3 +52,32 @@ def test_primary_point_is_red_and_search_zone_is_blue():
 
 def test_no_af_data_means_no_overlay():
     assert af_overlay.build_items(_result()) == []
+
+
+def _n_boxes(n):
+    return [AFBox(geometry.Box(i, i, i + 5, i + 5), is_primary=False) for i in range(n)]
+
+
+def test_few_boxes_keep_the_rich_rendering_with_cross():
+    items = af_overlay.build_items(_result(_n_boxes(af_overlay.MANY_BOXES_THRESHOLD)))
+    crosses = [i for i in items if i.flags() & QGraphicsItem.ItemIgnoresTransformations]
+    assert crosses  # center cross present when few boxes
+
+
+def test_many_boxes_drop_the_cross_and_use_thin_lines():
+    n = af_overlay.MANY_BOXES_THRESHOLD + 1
+    items = af_overlay.build_items(_result(_n_boxes(n)))
+    crosses = [i for i in items if i.flags() & QGraphicsItem.ItemIgnoresTransformations]
+    assert not crosses  # no crosses above the threshold
+    rects = _colored_rects(items)
+    # one rectangle per box, same count -- nothing merged or dropped
+    assert len(rects) == n
+    assert all(r.pen().widthF() == af_overlay.DENSE_LINE_WIDTH for r in rects)
+
+
+def test_many_boxes_keep_every_point_at_its_exact_position():
+    boxes = _n_boxes(af_overlay.MANY_BOXES_THRESHOLD + 5)
+    items = af_overlay.build_items(_result(boxes))
+    drawn = {(round(r.rect().left()), round(r.rect().top())) for r in _colored_rects(items)}
+    expected = {(round(b.box.left), round(b.box.top)) for b in boxes}
+    assert drawn == expected

@@ -36,6 +36,7 @@ from core import exif_reader, frame_builder
 from gui import af_overlay
 from gui import zoom as zoom_utils
 from gui.info_panel import InfoPanel
+from version import __version__
 
 
 class _ZoomableGraphicsView(QGraphicsView):
@@ -107,7 +108,7 @@ def _show_message(parent, icon, title: str, text: str) -> None:
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("AFocusPoint — Punto di messa a fuoco")
+        self.setWindowTitle(f"AFocusPoint {__version__} — Punto di messa a fuoco")
         self.resize(1200, 800)
 
         self._zoom: float = zoom_utils.MIN_ZOOM
@@ -152,6 +153,24 @@ class MainWindow(QMainWindow):
         view_menu.addAction(zoom_in_action)
         view_menu.addAction(zoom_out_action)
         view_menu.addAction(fit_action)
+
+        # "Informazioni" mostra la versione. Su macOS Qt sposta da solo questa
+        # voce nel menu dell'applicazione (AFocusPoint -> Informazioni), dove
+        # l'utente Mac se la aspetta; su Windows resta nel menu "Aiuto".
+        about_action = QAction("Informazioni su AFocusPoint", self)
+        about_action.triggered.connect(self._show_about)
+        help_menu = self.menuBar().addMenu("&Aiuto")
+        help_menu.addAction(about_action)
+
+    def _show_about(self) -> None:
+        _show_message(
+            self,
+            QMessageBox.Information,
+            "Informazioni su AFocusPoint",
+            f"AFocusPoint versione {__version__}\n\n"
+            "Mostra il punto di messa a fuoco e il tipo di AF registrati "
+            "dalla fotocamera in un file RAW Canon (CR3).",
+        )
 
     def _build_layout(self) -> None:
         central = QWidget()
