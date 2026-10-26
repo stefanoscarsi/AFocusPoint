@@ -168,21 +168,33 @@ def _parse_index_list(value) -> set[int]:
     return result
 
 
-# Descrizioni leggibili delle modalita' AF (Canon AFAreaMode e' un codice
-# numerico nel tag "raw"; questi valori sono quelli noti per le EOS R
-# recenti - verificali con inspect_tags.py se qualcosa non torna).
+# Riserva usata SOLO se ExifTool restituisce il codice numerico grezzo senza
+# una descrizione testuale (caso raro: normalmente il nome arriva gia' da
+# ExifTool). Codici e nomi allineati alla tabella autorevole di ExifTool
+# (Image::ExifTool::Canon, AFInfo2), cosi' la riserva coincide con cio' che
+# l'app mostra di norma. Verificato sui CR3 della R6 III: 9=Spot AF,
+# 13=Flexizone Single, 19=Flexible Zone AF 1.
 _AF_AREA_MODE_DESCRIPTIONS = {
-    0: "Punto singolo AF",
-    1: "AF automatico (area intera)",
-    2: "Spot AF",
-    4: "AF area espansa",
-    5: "Zona AF",
-    6: "AF area grande (zona)",
-    7: "Zona flessibile 1",
-    8: "Zona flessibile 2",
-    9: "Zona flessibile 3",
-    10: "Area intera / tracking soggetto",
-    11: "AF area espansa (attorno)",
+    0: "Off (Manual Focus)",
+    1: "AF Point Expansion (surround)",
+    2: "Single-point AF",
+    4: "Auto",
+    5: "Face Detect AF",
+    6: "Face + Tracking",
+    7: "Zone AF",
+    8: "AF Point Expansion (4 point)",
+    9: "Spot AF",
+    10: "AF Point Expansion (8 point)",
+    11: "Flexizone Multi (49 point)",
+    12: "Flexizone Multi (9 point)",
+    13: "Flexizone Single",
+    14: "Large Zone AF",
+    16: "Large Zone AF (vertical)",
+    17: "Large Zone AF (horizontal)",
+    19: "Flexible Zone AF 1",
+    20: "Flexible Zone AF 2",
+    21: "Flexible Zone AF 3",
+    22: "Whole Area AF",
 }
 
 

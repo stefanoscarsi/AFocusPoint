@@ -3,6 +3,16 @@
 Il numero di versione vive in `version.py` (unico punto). Ogni release ha
 un tag git `vX.Y.Z`. Schema: MAJOR.MINOR.PATCH (vedi `version.py`).
 
+## 1.0.1 — 2026-10-26
+
+### Modificato
+- Tabella di riserva dei nomi delle modalità AF (`_AF_AREA_MODE_DESCRIPTIONS`
+  in `core/af_parser.py`) allineata ai codici ufficiali di ExifTool
+  (Canon AFInfo2), verificati sui file della R6 III: 9=Spot AF,
+  13=Flexizone Single, 19=Flexible Zone AF 1. Correzione di dati latenti:
+  la visualizzazione normale (che usa il testo di ExifTool) non cambia; la
+  riserva serve solo se ExifTool restituisse il solo codice numerico.
+
 ## 1.0.0 — 2026-10-26
 
 Prima versione con numero. Raccoglie il lavoro che ha reso l'app funzionante
