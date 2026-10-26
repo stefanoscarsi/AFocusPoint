@@ -36,10 +36,12 @@ Per questo il progetto è diviso in due fasi:
 ### ExifTool (obbligatorio, motore di lettura dei metadati)
 
 - **Windows**: scarica la build più recente da https://exiftool.org (il file
-  "Windows Executable"). Viene scaricato come `exiftool(-k).exe`:
-  **rinominalo in `exiftool.exe`** e spostalo in una cartella presente nel
-  PATH di sistema (es. `C:\Windows\` o una cartella dedicata aggiunta al
-  PATH) — senza questo passaggio il programma non lo trova.
+  "Windows Executable", uno zip). Dentro trovi `exiftool(-k).exe` e la
+  cartella `exiftool_files`: **rinomina l'exe in `exiftool.exe`** e sposta
+  entrambi, insieme, in una cartella presente nel PATH di sistema (es. una
+  cartella dedicata come `C:\exiftool` aggiunta al PATH) — senza la
+  cartella `exiftool_files` accanto l'exe non funziona, e senza il PATH il
+  programma non lo trova.
 - **Mac**: piu' comodo via Homebrew: `brew install exiftool`. In alternativa,
   scarica il pacchetto `.dmg` da https://exiftool.org.
 - **Linux (Ubuntu/Debian)**: `sudo apt install libimage-exiftool-perl`
@@ -59,6 +61,34 @@ python3 -m venv venv
 source venv/bin/activate        # su Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
+
+### Riprendere lo sviluppo su un altro computer (Mac o Windows)
+
+Tutto il codice, i test e gli script di build sono nel repository. Restano
+fuori, e vanno ricreati su ogni computer, solo l'ambiente virtuale `venv/`
+e le cartelle generate dalla build (`build/`, `dist/`).
+
+1. Installa Python 3.10 o superiore, Git ed ExifTool (vedi sopra).
+2. Scarica il progetto ed entra nella cartella:
+   ```bash
+   git clone https://github.com/stefanoscarsi/AFocusPoint.git
+   cd AFocusPoint
+   ```
+3. Crea l'ambiente virtuale e installa anche gli strumenti di sviluppo
+   (test e build):
+   ```bash
+   python3 -m venv venv            # su Windows: py -m venv venv
+   source venv/bin/activate        # su Windows: venv\Scripts\activate
+   pip install -r requirements-dev.txt
+   ```
+4. Verifica che sia tutto a posto lanciando i test:
+   ```bash
+   python -m pytest
+   ```
+
+I test non hanno bisogno di foto vere né di ExifTool. Per provare l'app
+servono invece dei tuoi file CR3: non sono nel repository (sono grandi e
+personali).
 
 ## 2. Calibrazione (fai questo PRIMA di usare la GUI)
 
@@ -201,6 +231,9 @@ verificato.
 ```
 AFocusPoint/
 ├── main.py                    # avvio dell'app (gestisce anche "Apri con...")
+├── requirements.txt           # dipendenze per eseguire l'app
+├── requirements-dev.txt       # + strumenti di sviluppo (pytest, PyInstaller)
+├── CLAUDE.md                  # note sul progetto per Claude Code
 ├── avvia.bat                  # avvio comodo Windows (doppio click)
 ├── avvia.command              # avvio comodo Mac (doppio click)
 ├── apri_con.bat                # wrapper per "Apri con..."/DxO se usi i sorgenti
